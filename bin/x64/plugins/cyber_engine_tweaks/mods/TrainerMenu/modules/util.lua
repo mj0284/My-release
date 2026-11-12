@@ -17,9 +17,9 @@ function Util.round(v, decimals)
     return math.floor(v * m + 0.5) / m
 end
 
--- CET 콘솔 + 모드 로그 파일(F5Trainer.log) 양쪽에 남긴다.
+-- CET 콘솔 + 모드 로그 파일(TrainerMenu.log) 양쪽에 남긴다.
 function Util.log(msg)
-    msg = "[F5Trainer] " .. tostring(msg)
+    msg = "[TrainerMenu] " .. tostring(msg)
     print(msg)
     if spdlog and spdlog.info then
         pcall(spdlog.info, msg)

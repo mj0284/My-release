@@ -1,7 +1,7 @@
 -- 키 입력 처리
 --
 -- CET 는 오버레이가 닫혀 있으면 ImGui 에 키 입력을 넘기지 않고, registerHotkey 는 사용자가
--- 직접 키를 바인딩해야 한다. 그래서 "설치만 하면 F5 로 열리는" 동작은 Codeware 의
+-- 직접 키를 바인딩해야 한다. 그래서 "설치만 하면 바로 열리는" 동작은 Codeware 의
 -- Input/Key 콜백(게임의 원시 키 입력)으로 구현한다.
 --
 -- 콜백은 게임 입력 처리 도중에 불리므로 여기서는 상태만 기록하고,
@@ -146,7 +146,7 @@ function Input.reset()
     queue = {}
 end
 
--- "IK_F5" -> "F5"
+-- "IK_Insert" -> "Insert"
 function Input.keyLabel(key)
     return (tostring(key):gsub("^IK_", ""))
 end

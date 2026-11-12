@@ -1,4 +1,4 @@
--- F5 Trainer 테스트 (게임 없이 LuaJIT 으로 실행)
+-- Trainer Menu 테스트 (게임 없이 LuaJIT 으로 실행)
 --
 --   luajit tests/run_tests.lua
 --
@@ -7,11 +7,11 @@
 -- 주의: 가짜 환경이므로 "게임 안에서 실제로 그렇게 동작한다"는 보장은 아니다.
 local scriptDir = (arg and arg[0] or "tests/run_tests.lua"):match("^(.*)/[^/]*$") or "."
 local repoRoot = scriptDir .. "/.."
-local modRoot = repoRoot .. "/bin/x64/plugins/cyber_engine_tweaks/mods/F5Trainer"
+local modRoot = repoRoot .. "/bin/x64/plugins/cyber_engine_tweaks/mods/TrainerMenu"
 
 local Mock = dofile(scriptDir .. "/cet_mock.lua")
 
-local tmpBase = os.getenv("F5T_TEST_TMP") or os.tmpname() .. "_f5trainer"
+local tmpBase = os.getenv("TM_TEST_TMP") or os.tmpname() .. "_trainermenu"
 os.execute("mkdir -p '" .. tmpBase .. "'")
 
 local passed, failed = 0, {}
@@ -49,9 +49,18 @@ local function test(name, fn)
     end
 end
 
--- 모드를 불러온 world 를 만든다.
+local MENU_KEY = "IK_Insert" -- 모드의 기본 메뉴 키
+local QUICKSAVE_KEY = "IK_F5" -- 게임의 기본 퀵세이브 키
+
+-- 모드를 불러온 world 를 만든다. opts.menuKey 를 주면 그 키가 설정에 저장된 상태로 시작한다.
 local function boot(opts)
     current = newWorld(opts)
+    if opts and opts.menuKey then
+        local file = current.realOpen(current.dataDir .. "/config.json", "w")
+        file:write('{"toggleKey":"' .. opts.menuKey .. '"}')
+        file:close()
+        current.menuKey = opts.menuKey
+    end
     current.mod = current.loadMod()
     return current
 end
@@ -84,7 +93,7 @@ end
 
 -- 메뉴를 열고 루트에서 index 번째 하위 메뉴로 들어간다.
 local function openSubmenu(world, index)
-    world.tap("IK_F5")
+    world.tap(world.menuKey or MENU_KEY)
     for _ = 2, index do world.tap("IK_Down") end
     world.tap("IK_Enter")
 end
@@ -96,7 +105,7 @@ end
 local PLAYER, PROGRESS, ITEMS, WORLD, TELEPORT, SETTINGS = 1, 2, 3, 4, 5, 6
 
 ----------------------------------------------------------------------------------------------------
-io.write("F5 Trainer tests\n")
+io.write("Trainer Menu tests\n")
 
 test("loads and registers everything with CET", function()
     local w = boot()
@@ -104,7 +113,7 @@ test("loads and registers everything with CET", function()
     for _, event in ipairs({ "onInit", "onUpdate", "onDraw", "onOverlayOpen", "onOverlayClose", "onShutdown" }) do
         truthy(w.events[event], event .. " registered")
     end
-    truthy(w.hotkeys["f5trainer_toggle"], "CET hotkey registered")
+    truthy(w.hotkeys["trainermenu_toggle"], "CET hotkey registered")
     truthy(w.overrides["gameuiInGameMenuGameController.HandleQuickSave"], "quick save override")
     truthy(w.observers["PlayerPuppet.OnGameAttached"], "session observer")
     eq(w.count("RegisterCallback"), 1, "Codeware Input/Key callback")
@@ -112,31 +121,34 @@ test("loads and registers everything with CET", function()
     eq(#w.ui.rows, 0, "menu hidden at start")
 end)
 
-test("F5 opens and closes the menu", function()
+test("Insert opens and closes the menu, and F5 is left alone", function()
     local w = boot()
     w.tap("IK_F5")
+    eq(#w.ui.rows, 0, "F5 does not open the menu")
+    w.tap("IK_Insert")
     eq(#w.ui.rows, 6, "root menu rows")
-    truthy(w.hasText("F5 트레이너"), "korean title")
+    truthy(w.hasText("트레이너 메뉴"), "korean title")
+    truthy(w.hasText("Insert:"), "footer names the menu key")
     eq(w.selectedRow(), 1, "cursor on first row")
-    w.tap("IK_F5")
+    w.tap("IK_Insert")
     eq(#w.ui.rows, 0, "menu closed")
 end)
 
-test("holding F5 does not flicker the menu", function()
+test("holding the menu key does not flicker the menu", function()
     local w = boot()
-    w.key("IK_F5", "IACT_Press")
+    w.key(MENU_KEY, "IACT_Press")
     w.frames(5)
-    w.key("IK_F5", "IACT_Press") -- OS 키 반복으로 Press 가 또 오는 경우
+    w.key(MENU_KEY, "IACT_Press") -- OS 키 반복으로 Press 가 또 오는 경우
     w.frames(60, 0.05)
     eq(#w.ui.rows, 6, "still open after holding")
-    w.key("IK_F5", "IACT_Release")
+    w.key(MENU_KEY, "IACT_Release")
     w.frame()
     eq(#w.ui.rows, 6, "release does not toggle")
 end)
 
 test("arrow keys navigate, wrap around, Backspace goes back and closes", function()
     local w = boot()
-    w.tap("IK_F5")
+    w.tap(MENU_KEY)
     w.tap("IK_Down")
     eq(w.selectedRow(), 2, "moved down")
     w.tap("IK_Up") w.tap("IK_Up")
@@ -154,7 +166,7 @@ end)
 
 test("numpad keys work as navigation too", function()
     local w = boot()
-    w.tap("IK_F5")
+    w.tap(MENU_KEY)
     w.tap("IK_NumPad2")
     eq(w.selectedRow(), 2, "numpad 2 = down")
     w.tap("IK_NumPad8")
@@ -201,17 +213,17 @@ test("god mode: applies, keeps health full, re-applies, and removes", function()
     openSubmenu(w, PLAYER)
     w.tap("IK_Enter") -- 무적
     w.frames(20)
-    truthy(w.godModes["Invulnerable|F5Trainer"], "invulnerable added")
+    truthy(w.godModes["Invulnerable|TrainerMenu"], "invulnerable added")
     truthy((w.pools.Health or 0) > 0, "health refilled")
     truthy(w.hasText("켜짐"), "shows ON")
 
     w.godModes = {} -- 게임이 갓모드를 지운 상황
     w.frames(20)
-    truthy(w.godModes["Invulnerable|F5Trainer"], "re-applied")
+    truthy(w.godModes["Invulnerable|TrainerMenu"], "re-applied")
 
     w.tap("IK_Enter")
     w.frames(20)
-    eq(w.godModes["Invulnerable|F5Trainer"], nil, "removed when turned off")
+    eq(w.godModes["Invulnerable|TrainerMenu"], nil, "removed when turned off")
     local fills = w.pools.Health
     w.frames(30)
     eq(w.pools.Health, fills, "no more refills when off")
@@ -469,10 +481,10 @@ test("police toggle locks the prevention system and wanted level can be cleared"
     down(w, 6) w.tap("IK_Enter") -- 수배 해제
     eq(w.wantedLevel, "Heat_0", "wanted level cleared")
     down(w, 1) w.tap("IK_Enter") -- 경찰 비활성화
-    truthy(w.policeLocks.F5Trainer, "police locked")
+    truthy(w.policeLocks.TrainerMenu, "police locked")
     eq(w.policeEnabled, false, "police system off")
     w.tap("IK_Enter")
-    eq(w.policeLocks.F5Trainer, nil, "police unlocked")
+    eq(w.policeLocks.TrainerMenu, nil, "police unlocked")
     eq(w.policeEnabled, true, "police system back on")
 end)
 
@@ -485,7 +497,7 @@ test("clearing the wanted level does not quietly re-enable disabled police", fun
     w.tap("IK_Up") w.tap("IK_Enter") -- 수배 해제: 게임이 시스템을 다시 켠다
     eq(w.wantedLevel, "Heat_0", "wanted level cleared")
     eq(w.policeEnabled, false, "still off afterwards")
-    truthy(w.policeLocks.F5Trainer, "lock still held")
+    truthy(w.policeLocks.TrainerMenu, "lock still held")
 end)
 
 test("disabled police are re-asserted after loading a save that had them re-enabled", function()
@@ -513,9 +525,18 @@ end)
 
 test("a police lock left in a save is cleared on the next session", function()
     local w = boot()
-    w.policeLocks.F5Trainer = true -- 이전 플레이에서 켠 채로 저장된 세이브
+    w.policeLocks.TrainerMenu = true -- 이전 플레이에서 켠 채로 저장된 세이브
     w.frames(100)
-    eq(w.policeLocks.F5Trainer, nil, "stale lock removed")
+    eq(w.policeLocks.TrainerMenu, nil, "stale lock removed")
+    eq(w.policeEnabled, true, "police back on")
+end)
+
+test("a police lock left by the old mod name (F5Trainer) is cleared too", function()
+    local w = boot()
+    w.policeLocks.F5Trainer = true -- 이름을 바꾸기 전 버전으로 경찰을 끈 채 저장한 세이브
+    w.policeEnabled = false
+    w.frames(100)
+    eq(w.policeLocks.F5Trainer, nil, "legacy lock removed")
     eq(w.policeEnabled, true, "police back on")
 end)
 
@@ -567,24 +588,26 @@ test("settings persist: language, menu key, quick save option", function()
     local dataDir = w.dataDir
     openSubmenu(w, SETTINGS)
     w.tap("IK_Right") -- 언어 -> English
-    truthy(w.hasText("F5 TRAINER"), "switched to English")
+    truthy(w.hasText("TRAINER MENU"), "switched to English")
     truthy(w.hasText("< English >"), "language value")
-    down(w, 1) w.tap("IK_Right") -- 메뉴 키 F5 -> F6
-    truthy(w.hasText("< F6 >"), "key value")
+    down(w, 1) w.tap("IK_Right") -- 메뉴 키 Insert -> Delete
+    truthy(w.hasText("< Delete >"), "key value")
     down(w, 1) w.tap("IK_Enter") -- 퀵세이브 막기 끔
 
-    w.tap("IK_F5")
+    w.tap("IK_Insert")
     eq(#w.ui.rows, 3, "old key no longer toggles")
-    w.tap("IK_F6")
+    w.tap("IK_Delete")
     eq(#w.ui.rows, 0, "new key closes")
     current.uninstall()
 
     current = newWorld({ dataDir = dataDir })
     local w2 = current
     w2.loadMod()
-    w2.tap("IK_F6")
+    w2.tap("IK_Insert")
+    eq(#w2.ui.rows, 0, "default key stays replaced after restart")
+    w2.tap("IK_Delete")
     eq(#w2.ui.rows, 6, "saved key works after restart")
-    truthy(w2.hasText("F5 TRAINER"), "saved language")
+    truthy(w2.hasText("TRAINER MENU"), "saved language")
     w2.tap("IK_Up") w2.tap("IK_Enter")
     truthy(w2.hasText("OFF"), "saved quick save option")
 end)
@@ -596,9 +619,9 @@ test("a corrupt or hostile config.json falls back to defaults", function()
     file:write('{"language":"xx","toggleKey":"IK_W","noclipSpeed":"fast","positions":{"1":{"x":"a"}},"blockQuickSave":3}')
     file:close()
     w.loadMod()
-    w.tap("IK_F5")
-    eq(#w.ui.rows, 6, "F5 still opens")
-    truthy(w.hasText("F5 트레이너"), "default language")
+    w.tap("IK_Insert")
+    eq(#w.ui.rows, 6, "default key still opens")
+    truthy(w.hasText("트레이너 메뉴"), "default language")
     current.uninstall()
 
     current = newWorld()
@@ -609,30 +632,43 @@ test("a corrupt or hostile config.json falls back to defaults", function()
     truthy(w.loadMod().ready, "loads with broken json")
 end)
 
-test("quick save: F5 for the trainer does not save (key event first)", function()
+test("quick save: with the default key, F5 quick save is left completely alone", function()
     local w = boot()
     local controller = w.quickSaveController()
-    w.key("IK_F5", "IACT_Press")
+    w.key(QUICKSAVE_KEY, "IACT_Press")
+    controller:HandleQuickSave()
+    eq(w.quickSaves, 1, "saved immediately, no deferral")
+    w.key(QUICKSAVE_KEY, "IACT_Release")
+    w.frames(30)
+    eq(w.quickSaves, 1, "exactly once")
+    eq(#w.ui.rows, 0, "and F5 did not open the menu")
+end)
+
+test("quick save: with F5 as the menu key, F5 does not save (key event first)", function()
+    local w = boot({ menuKey = QUICKSAVE_KEY })
+    local controller = w.quickSaveController()
+    w.key(QUICKSAVE_KEY, "IACT_Press")
     controller:HandleQuickSave()
     w.frames(30)
-    w.key("IK_F5", "IACT_Release")
+    w.key(QUICKSAVE_KEY, "IACT_Release")
     w.frames(30)
     eq(w.quickSaves, 0, "no quick save")
+    eq(#w.ui.rows, 6, "the menu opened instead")
 end)
 
-test("quick save: F5 for the trainer does not save (game action first)", function()
-    local w = boot()
+test("quick save: with F5 as the menu key, F5 does not save (game action first)", function()
+    local w = boot({ menuKey = QUICKSAVE_KEY })
     local controller = w.quickSaveController()
     controller:HandleQuickSave() -- 키 이벤트보다 게임 액션이 먼저 온 경우
-    w.key("IK_F5", "IACT_Press")
+    w.key(QUICKSAVE_KEY, "IACT_Press")
     w.frames(30)
-    w.key("IK_F5", "IACT_Release")
+    w.key(QUICKSAVE_KEY, "IACT_Release")
     w.frames(30)
     eq(w.quickSaves, 0, "no quick save")
 end)
 
-test("quick save: a save requested by another key still happens, exactly once", function()
-    local w = boot()
+test("quick save: with F5 as the menu key, a save from another key still happens, exactly once", function()
+    local w = boot({ menuKey = QUICKSAVE_KEY })
     local controller = w.quickSaveController()
     controller:HandleQuickSave()
     eq(w.quickSaves, 0, "deferred for a moment")
@@ -642,23 +678,16 @@ test("quick save: a save requested by another key still happens, exactly once", 
     eq(w.quickSaves, 1, "not saved twice")
 end)
 
-test("quick save: untouched when the option is off or the menu key is not F5", function()
-    local w = boot()
+test("quick save: with F5 as the menu key, the block can be switched off", function()
+    local w = boot({ menuKey = QUICKSAVE_KEY })
     local controller = w.quickSaveController()
     openSubmenu(w, SETTINGS)
     down(w, 2) w.tap("IK_Enter") -- 막기 끔
+    truthy(w.hasText("꺼짐"), "option shows OFF")
     w.frames(30)
-    w.key("IK_F5", "IACT_Press")
+    w.key(QUICKSAVE_KEY, "IACT_Press")
     controller:HandleQuickSave()
     eq(w.quickSaves, 1, "saves immediately with the option off")
-    w.key("IK_F5", "IACT_Release")
-    w.frames(30)
-
-    w.tap("IK_Enter") -- 다시 켬
-    w.tap("IK_Up") w.tap("IK_Right") -- 메뉴 키 F6
-    w.key("IK_F5", "IACT_Press")
-    controller:HandleQuickSave()
-    eq(w.quickSaves, 2, "F5 saves normally when the menu key is F6")
 end)
 
 test("without Codeware: usable with the mouse in the CET overlay", function()
@@ -701,7 +730,7 @@ end)
 
 test("overlay mode: left click cycles a value forward, right click backward, X closes", function()
     local w = boot()
-    w.tap("IK_F5")
+    w.tap(MENU_KEY)
     w.events.onOverlayOpen()
     w.click = "월드"
     w.frame() w.frame()
@@ -736,13 +765,13 @@ end)
 
 test("CET hotkey toggles, but not twice for the same key press", function()
     local w = boot()
-    w.hotkeys["f5trainer_toggle"]()
+    w.hotkeys["trainermenu_toggle"]()
     w.frame()
     eq(#w.ui.rows, 6, "hotkey opens")
-    w.key("IK_F5", "IACT_Press") -- Codeware 쪽에서 닫힘
+    w.key(MENU_KEY, "IACT_Press") -- Codeware 쪽에서 닫힘
     w.frame()
-    w.key("IK_F5", "IACT_Release")
-    w.hotkeys["f5trainer_toggle"]() -- 같은 키가 CET 에도 바인딩된 경우
+    w.key(MENU_KEY, "IACT_Release")
+    w.hotkeys["trainermenu_toggle"]() -- 같은 키가 CET 에도 바인딩된 경우
     w.frame()
     eq(#w.ui.rows, 0, "closed once, not reopened")
 end)
@@ -754,7 +783,7 @@ test("every menu page draws in both languages", function()
             openSubmenu(w, SETTINGS)
             w.tap("IK_Right")
             w.tap("IK_Backspace")
-            w.tap("IK_F5")
+            w.tap(MENU_KEY)
         end
         for index = 1, 6 do
             openSubmenu(w, index)
@@ -766,9 +795,9 @@ test("every menu page draws in both languages", function()
             w.tap("IK_Backspace")
             eq(#w.ui.rows, 0, "closed")
             -- 다음 반복에서 커서가 루트 첫 줄이 아니므로 맞춰 준다
-            w.tap("IK_F5")
+            w.tap(MENU_KEY)
             for _ = 2, index do w.tap("IK_Up") end
-            w.tap("IK_F5")
+            w.tap(MENU_KEY)
         end
         current.uninstall()
         current = nil
@@ -797,15 +826,15 @@ test("shutdown undoes what was left in the game", function()
     down(w, 5) w.tap("IK_Left")       -- 게임 속도
     down(w, 2) w.tap("IK_Enter")      -- 경찰 비활성화
     w.frames(20)
-    truthy(w.godModes["Invulnerable|F5Trainer"] and w.equipFlags.InfiniteAmmo and #w.statMods == 2
-        and w.dilation.consoleCommand and w.policeLocks.F5Trainer, "everything active before shutdown")
+    truthy(w.godModes["Invulnerable|TrainerMenu"] and w.equipFlags.InfiniteAmmo and #w.statMods == 2
+        and w.dilation.consoleCommand and w.policeLocks.TrainerMenu, "everything active before shutdown")
 
     w.events.onShutdown()
     eq(next(w.godModes), nil, "god mode removed")
     eq(w.equipFlags.InfiniteAmmo, nil, "ammo flag removed")
     eq(#w.statMods, 0, "stat modifiers removed")
     eq(w.dilation.consoleCommand, nil, "time dilation removed")
-    eq(w.policeLocks.F5Trainer, nil, "police unlocked")
+    eq(w.policeLocks.TrainerMenu, nil, "police unlocked")
     eq(w.policeEnabled, true, "police back on")
 end)
 

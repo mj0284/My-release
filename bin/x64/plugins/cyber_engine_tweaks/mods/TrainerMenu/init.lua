@@ -1,11 +1,11 @@
--- F5 Trainer - Cyberpunk 2077 트레이너 메뉴 (Cyber Engine Tweaks 모드)
+-- Trainer Menu - Cyberpunk 2077 트레이너 메뉴 (Cyber Engine Tweaks 모드)
 --
 -- 필요 모드: Cyber Engine Tweaks, RED4ext, Codeware
 --   * CET      : Lua 실행 / ImGui 화면 / 게임 스크립트 호출
---   * Codeware : 게임의 원시 키 입력(F5, 방향키) 수신 -> 바인딩 설정 없이 바로 F5 로 열림
+--   * Codeware : 게임의 원시 키 입력(Insert, 방향키) 수신 -> 바인딩 설정 없이 바로 Insert 로 열림
 --
 -- 조작
---   F5              메뉴 열기/닫기 (설정에서 변경 가능)
+--   Insert          메뉴 열기/닫기 (설정에서 변경 가능)
 --   방향키 위/아래   항목 이동        (넘패드 8/2)
 --   방향키 좌/우     값 조절/토글     (넘패드 4/6)
 --   Enter           선택/실행        (넘패드 5)
@@ -19,8 +19,8 @@ local Cheats = require("modules/cheats")
 local Menu = require("modules/menu")
 local UI = require("modules/ui")
 
-local F5Trainer = {
-    version = "1.0.0",
+local TrainerMenu = {
+    version = "1.1.0",
     ready = false,
     overlayOpen = false,
 }
@@ -69,7 +69,7 @@ local function handleKey(key, pressed, isRepeat)
         return
     end
     -- 오버레이가 열려 있으면 마우스로 조작한다 (어차피 키 입력이 게임까지 오지 않는다).
-    if not Menu.visible or F5Trainer.overlayOpen then
+    if not Menu.visible or TrainerMenu.overlayOpen then
         return
     end
     local dir = NAV_KEYS[key]
@@ -80,8 +80,8 @@ end
 
 -- CET 키 바인딩(선택 사항). Codeware 가 없거나 다른 키 조합으로 열고 싶을 때
 -- CET 오버레이 > Bindings 에서 키를 지정하면 된다. CET 핫키는 키를 뗄 때 실행된다.
-registerHotkey("f5trainer_toggle", "F5 Trainer: open / close menu", function()
-    if not F5Trainer.ready then
+registerHotkey("trainermenu_toggle", "Trainer Menu: open / close", function()
+    if not TrainerMenu.ready then
         return
     end
     -- 같은 키가 Codeware 쪽에서 이미 처리됐다면 두 번 토글하지 않는다.
@@ -92,10 +92,11 @@ registerHotkey("f5trainer_toggle", "F5 Trainer: open / close menu", function()
 end)
 
 ----------------------------------------------------------------------------------------------------
--- F5 퀵세이브 충돌 처리
+-- F5 퀵세이브 충돌 처리 (메뉴 키를 F5 로 바꿔 쓰는 경우에만 해당)
 ----------------------------------------------------------------------------------------------------
--- 게임 기본 퀵세이브 키가 F5 라서, 그대로 두면 메뉴를 열 때마다 퀵세이브가 된다.
+-- 게임 기본 퀵세이브 키가 F5 라서, 메뉴 키를 F5 로 쓰면 메뉴를 열 때마다 퀵세이브가 된다.
 -- 메뉴 키가 F5 이고 옵션이 켜져 있으면 F5 로 들어온 퀵세이브 요청만 걸러 낸다.
+-- 기본 메뉴 키(Insert)에서는 아무것도 건드리지 않는다.
 -- (퀵세이브를 다른 키로 바꿔 쓰는 경우에는 그대로 저장된다.)
 
 local function guardQuickSave()
@@ -164,14 +165,14 @@ registerForEvent("onInit", function()
     end
     Cheats.onSessionStart() -- 게임 도중 모드를 리로드한 경우
 
-    F5Trainer.ready = true
-    Util.log(string.format("v%s loaded - menu key: %s%s", F5Trainer.version,
+    TrainerMenu.ready = true
+    Util.log(string.format("v%s loaded - menu key: %s%s", TrainerMenu.version,
         Input.keyLabel(Config.data.toggleKey),
         Input.available and "" or " (Codeware missing: use the CET overlay or bind a CET hotkey)"))
 end)
 
 registerForEvent("onUpdate", function(deltaTime)
-    if not F5Trainer.ready then
+    if not TrainerMenu.ready then
         return
     end
     local ok, err = pcall(Input.poll)
@@ -185,24 +186,24 @@ registerForEvent("onUpdate", function(deltaTime)
 end)
 
 registerForEvent("onDraw", function()
-    if not F5Trainer.ready then
+    if not TrainerMenu.ready then
         return
     end
-    UI.draw(F5Trainer.overlayOpen)
+    UI.draw(TrainerMenu.overlayOpen)
 end)
 
 registerForEvent("onOverlayOpen", function()
-    F5Trainer.overlayOpen = true
+    TrainerMenu.overlayOpen = true
     Input.reset() -- 오버레이가 입력을 가로채서 키 떼는 이벤트를 놓치므로 눌림 상태를 비운다
     -- Codeware 가 없으면 키로 열 수 없으니 오버레이를 열 때 같이 띄운다.
-    if F5Trainer.ready and not Input.available and not Menu.visible then
+    if TrainerMenu.ready and not Input.available and not Menu.visible then
         Menu.open()
         autoOpened = true
     end
 end)
 
 registerForEvent("onOverlayClose", function()
-    F5Trainer.overlayOpen = false
+    TrainerMenu.overlayOpen = false
     Input.reset()
     if autoOpened then
         autoOpened = false
@@ -214,4 +215,4 @@ registerForEvent("onShutdown", function()
     pcall(Cheats.shutdown)
 end)
 
-return F5Trainer
+return TrainerMenu

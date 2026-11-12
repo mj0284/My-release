@@ -58,14 +58,14 @@ local function drawHeader(overlayOpen, width)
         local fontSize = ImGui.GetFontSize()
         ImGui.SameLine(width - fontSize * 3.6)
         if Menu.depth() > 1 then
-            if ImGui.SmallButton(" < ##f5t_back") then
+            if ImGui.SmallButton(" < ##tm_back") then
                 Menu.back()
             end
         else
             ImGui.Dummy(fontSize * 1.4, 1)
         end
         ImGui.SameLine()
-        if ImGui.SmallButton(" X ##f5t_close") then
+        if ImGui.SmallButton(" X ##tm_close") then
             Menu.close()
         end
     end
@@ -82,7 +82,7 @@ local function drawRows(overlayOpen, width)
         local value, isOn = Menu.valueOf(item)
         local selected = (index == cursor)
 
-        if ImGui.Selectable(label .. "##f5t_row" .. index, selected) and overlayOpen then
+        if ImGui.Selectable(label .. "##tm_row" .. index, selected) and overlayOpen then
             Menu.setCursor(index)
             Menu.activate()
         end
@@ -164,7 +164,7 @@ function UI.draw(overlayOpen)
     ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1.0)
 
     -- Begin 이 false 를 돌려줘도 End 는 반드시 호출해야 한다.
-    if ImGui.Begin("F5 Trainer##f5trainer_main", windowFlags(overlayOpen)) then
+    if ImGui.Begin("Trainer Menu##trainermenu_main", windowFlags(overlayOpen)) then
         local ok, err = pcall(drawBody, overlayOpen)
         if not ok and not drawErrorLogged then
             drawErrorLogged = true

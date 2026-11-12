@@ -9,7 +9,8 @@ local Input = require("modules/input")
 
 local Cheats = {}
 
-local SOURCE = "F5Trainer"           -- 갓모드/경찰 잠금에 남기는 출처 이름
+local SOURCE = "TrainerMenu"         -- 갓모드/경찰 잠금에 남기는 출처 이름
+local LEGACY_SOURCE = "F5Trainer"    -- 모드 이름을 바꾸기 전에 쓰던 출처 이름 (세이브에 남아 있을 수 있다)
 local DILATION_REASON = "consoleCommand"
 local TICK_INTERVAL = 0.2            -- 유지형 치트(무적, 무한 스태미나 등) 갱신 주기 (초)
 local AMMO_INTERVAL = 2.0            -- 예비 탄약 보충 확인 주기 (초)
@@ -169,9 +170,9 @@ end
 -- 경찰(프리벤션) 시스템 켜기/끄기 요청. 게임은 출처 이름별 잠금 목록으로 관리한다:
 --   isActive=false -> 우리 이름을 잠금 목록에 추가하고 시스템을 끈다 (이미 목록에 있으면 아무 일도 안 함)
 --   isActive=true  -> 우리 이름을 목록에서 빼고, 목록이 비면 시스템을 켠다
-local function sendPolice(active)
+local function sendPolice(active, source)
     local request = TogglePreventionSystem.new()
-    request.sourceName = CName.new(SOURCE)
+    request.sourceName = CName.new(source or SOURCE)
     request.isActive = active
     Game.GetScriptableSystemsContainer():Get("PreventionSystem"):QueueRequest(request)
 end
@@ -594,6 +595,8 @@ local function reapplyAfterSessionStart(player)
     if gameSpeed ~= 1.0 then
         guarded("reapply game speed", applyGameSpeed)
     end
+    -- 예전 이름(F5Trainer)으로 경찰을 끈 채 저장한 세이브라면 그 잠금이 남아 있다. 풀 방법이 없어지므로 치워 준다.
+    guarded("clear legacy police lock", sendPolice, true, LEGACY_SOURCE)
     -- 꺼져 있으면 이전 세션에서 세이브에 남았을 수 있는 잠금을 지우고, 켜져 있으면 다시 건다.
     guarded("reapply police", setPoliceDisabled, toggles.noPolice)
 end

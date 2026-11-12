@@ -17,8 +17,8 @@ Config.SAVE_SLOTS = 5
 local function defaults()
     return {
         language = "ko",        -- "ko" | "en"
-        toggleKey = "IK_F5",    -- 메뉴 열기/닫기 키
-        blockQuickSave = true,  -- 메뉴 키가 F5 일 때 게임의 F5 퀵세이브를 막는다
+        toggleKey = "IK_Insert", -- 메뉴 열기/닫기 키
+        blockQuickSave = true,  -- 메뉴 키를 F5 로 바꿨을 때 게임의 F5 퀵세이브를 막는다
         noclipSpeed = 10,       -- 노클립 이동 속도 (m/s)
         positions = {},         -- 저장한 위치: ["1"] = { x=, y=, z=, yaw= }
     }

@@ -6,7 +6,7 @@ local Lang = {}
 local current = "ko"
 
 local S = {
-    title            = { ko = "F5 트레이너", en = "F5 TRAINER" },
+    title            = { ko = "트레이너 메뉴", en = "TRAINER MENU" },
 
     -- 메뉴 이름
     menu_player      = { ko = "플레이어", en = "Player" },
@@ -66,7 +66,7 @@ local S = {
     -- 설정
     language         = { ko = "Language / 언어", en = "Language / 언어" },
     toggle_key       = { ko = "메뉴 열기 키", en = "Menu Toggle Key" },
-    block_quicksave  = { ko = "메뉴 키로 퀵세이브 되는 것 막기", en = "Block Quick Save on Menu Key" },
+    block_quicksave  = { ko = "메뉴 키가 F5 일 때 퀵세이브 막기", en = "Block Quick Save When Menu Key Is F5" },
 
     -- 값 표시
     on               = { ko = "켜짐", en = "ON" },
@@ -76,8 +76,8 @@ local S = {
     hint_keys        = { ko = "방향키: 이동/조절   Enter: 선택   Backspace: 뒤로", en = "Arrows: move/adjust   Enter: select   Backspace: back" },
     hint_mouse       = { ko = "CET 오버레이: 마우스로 클릭해서 조작", en = "CET overlay: click with the mouse" },
     hint_noclip      = { ko = "노클립: WASD 이동, Space 상승, Ctrl 하강, Shift 가속", en = "Noclip: WASD move, Space up, Ctrl down, Shift fast" },
-    no_codeware      = { ko = "Codeware 가 없어서 키 조작(F5/방향키)이 꺼져 있습니다. CET 오버레이에서 마우스로 쓰거나 Codeware 를 설치하세요.",
-                         en = "Codeware not found: key controls (F5/arrows) are off. Use the mouse in the CET overlay, or install Codeware." },
+    no_codeware      = { ko = "Codeware 가 없어서 키 조작(메뉴 키/방향키)이 꺼져 있습니다. CET 오버레이에서 마우스로 쓰거나 Codeware 를 설치하세요.",
+                         en = "Codeware not found: key controls (menu key/arrows) are off. Use the mouse in the CET overlay, or install Codeware." },
     need_codeware    = { ko = "Codeware 가 필요한 기능입니다", en = "This feature requires Codeware" },
     not_in_game      = { ko = "게임 플레이 중에만 쓸 수 있습니다", en = "Only available while in game" },
     failed           = { ko = "실패: %s", en = "Failed: %s" },
