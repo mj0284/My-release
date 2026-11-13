@@ -35,6 +35,17 @@ local toggles = {
 local speedMult = 1.0
 local gameSpeed = 1.0
 
+-- 현재 치트 상태를 config.json 에 저장한다. 사용자가 값을 바꿀 때마다 호출.
+-- (모드 종료/리로드 때 효과를 되돌리는 Cheats.shutdown 은 저장하지 않으므로 마지막 상태가 남는다.)
+local function persist()
+    local saved = { speedMult = speedMult, gameSpeed = gameSpeed }
+    for _, name in ipairs(Config.CHEAT_TOGGLES) do
+        saved[name] = toggles[name] == true
+    end
+    Config.data.cheats = saved
+    Config.save()
+end
+
 local statMods = {}        -- [slot] = 추가해 둔 스탯 모디파이어 핸들 (제거할 때 필요)
 local noclipPos = nil      -- 노클립 중 우리가 관리하는 위치 { x, y, z }
 local tickTimer, ammoTimer = 0, 0
@@ -254,6 +265,7 @@ function Cheats.setToggle(name, on)
             return false, Lang.t("not_in_game")
         end
         toggles[name] = false -- 게임 밖에서 끄는 것은 그냥 허용
+        persist()
         return true
     end
 
@@ -269,6 +281,7 @@ function Cheats.setToggle(name, on)
         end
     end
     tickTimer = TICK_INTERVAL -- 다음 프레임에 바로 반영
+    persist()
     return true
 end
 
@@ -290,7 +303,7 @@ function Cheats.getSpeedMult()
 end
 
 function Cheats.setSpeedMult(value)
-    value = Util.clamp(Util.round(value, 2), 0.5, 5.0)
+    value = Util.clamp(Util.round(value, 2), Config.SPEED_RANGE[1], Config.SPEED_RANGE[2])
     return withPlayer(function(player)
         local previous = speedMult
         speedMult = value
@@ -299,6 +312,7 @@ function Cheats.setSpeedMult(value)
             speedMult = previous
             error(err, 0)
         end
+        persist()
     end)
 end
 
@@ -433,6 +447,7 @@ function Cheats.setGameSpeed(value)
             gameSpeed = previous
             error(err, 0)
         end
+        persist()
     end)
 end
 
@@ -599,6 +614,37 @@ local function reapplyAfterSessionStart(player)
     guarded("clear legacy police lock", sendPolice, true, LEGACY_SOURCE)
     -- 꺼져 있으면 이전 세션에서 세이브에 남았을 수 있는 잠금을 지우고, 켜져 있으면 다시 건다.
     guarded("reapply police", setPoliceDisabled, toggles.noPolice)
+end
+
+-- config.json 에 저장된 치트 상태를 불러온다. onInit 에서 Config.load / Input.init 다음에 한 번 호출.
+-- 실제 효과는 게임에 들어가면 Cheats.update 가 적용한다 (세션 시작 재적용 + 주기적 유지).
+-- 돌려주는 값: 켜진 치트 이름 목록 (로그용)
+function Cheats.restore()
+    local saved = Config.data.cheats or {}
+    local restored = {}
+    for _, name in ipairs(Config.CHEAT_TOGGLES) do
+        toggles[name] = saved[name] == true
+    end
+    -- 노클립은 Codeware 키 입력이 없으면 조작할 수 없으므로 켜지 않는다 (저장 값은 그대로 둔다).
+    if toggles.noclip and not Input.available then
+        toggles.noclip = false
+    end
+    speedMult = type(saved.speedMult) == "number" and saved.speedMult or 1.0
+    gameSpeed = type(saved.gameSpeed) == "number" and saved.gameSpeed or 1.0
+    noclipPos = nil
+
+    for _, name in ipairs(Config.CHEAT_TOGGLES) do
+        if toggles[name] then
+            restored[#restored + 1] = name
+        end
+    end
+    if speedMult ~= 1.0 then
+        restored[#restored + 1] = string.format("speed x%.2f", speedMult)
+    end
+    if gameSpeed ~= 1.0 then
+        restored[#restored + 1] = string.format("game speed x%.2f", gameSpeed)
+    end
+    return restored
 end
 
 -- PlayerPuppet 이 게임에 붙을 때(세이브 로드 등) init.lua 의 옵저버가 호출한다.

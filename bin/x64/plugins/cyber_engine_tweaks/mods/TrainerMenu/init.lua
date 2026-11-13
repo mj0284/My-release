@@ -20,7 +20,7 @@ local Menu = require("modules/menu")
 local UI = require("modules/ui")
 
 local TrainerMenu = {
-    version = "1.1.0",
+    version = "1.2.0",
     ready = false,
     overlayOpen = false,
 }
@@ -148,6 +148,12 @@ registerForEvent("onInit", function()
     Input.handler = handleKey
     Input.repeatKeys = REPEAT_KEYS
     Input.init()
+
+    -- 지난번에 켜 둔 치트/배율 복원 (게임에 들어가면 적용된다)
+    local restored = Cheats.restore()
+    if #restored > 0 then
+        Util.log("restored from config.json: " .. table.concat(restored, ", "))
+    end
 
     local ok, err = pcall(installQuickSaveGuard)
     if not ok then

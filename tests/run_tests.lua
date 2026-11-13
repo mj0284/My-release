@@ -52,15 +52,32 @@ end
 local MENU_KEY = "IK_Insert" -- 모드의 기본 메뉴 키
 local QUICKSAVE_KEY = "IK_F5" -- 게임의 기본 퀵세이브 키
 
--- 모드를 불러온 world 를 만든다. opts.menuKey 를 주면 그 키가 설정에 저장된 상태로 시작한다.
+-- 모드를 불러온 world 를 만든다.
+--   opts.menuKey : 그 키가 설정에 저장된 상태로 시작
+--   opts.config  : config.json 내용(문자열)을 그대로 써 둔 상태로 시작
 local function boot(opts)
     current = newWorld(opts)
+    local config = opts and opts.config
     if opts and opts.menuKey then
-        local file = current.realOpen(current.dataDir .. "/config.json", "w")
-        file:write('{"toggleKey":"' .. opts.menuKey .. '"}')
-        file:close()
+        config = '{"toggleKey":"' .. opts.menuKey .. '"}'
         current.menuKey = opts.menuKey
     end
+    if config then
+        local file = current.realOpen(current.dataDir .. "/config.json", "w")
+        file:write(config)
+        file:close()
+    end
+    current.mod = current.loadMod()
+    return current
+end
+
+-- 같은 모드 폴더(config.json)를 둔 채 게임을 껐다 켠 상황. 게임 쪽 상태는 새로 시작한다.
+local function restart(w, opts)
+    local dataDir = w.dataDir
+    current.uninstall()
+    opts = opts or {}
+    opts.dataDir = dataDir
+    current = newWorld(opts)
     current.mod = current.loadMod()
     return current
 end
@@ -610,6 +627,113 @@ test("settings persist: language, menu key, quick save option", function()
     truthy(w2.hasText("TRAINER MENU"), "saved language")
     w2.tap("IK_Up") w2.tap("IK_Enter")
     truthy(w2.hasText("OFF"), "saved quick save option")
+end)
+
+test("cheats and multipliers are restored after restarting the game", function()
+    local w = boot()
+    openSubmenu(w, PLAYER)
+    w.tap("IK_Enter")                                -- 무적
+    down(w, 1) w.tap("IK_Enter")                     -- 무한 스태미나
+    down(w, 3) w.tap("IK_Enter")                     -- 무한 탄약
+    down(w, 1) w.tap("IK_Enter")                     -- 소지 무게
+    down(w, 2) w.tap("IK_Right") w.tap("IK_Right")   -- 이동 속도 x2.0
+    w.tap("IK_Backspace")
+    down(w, 3) w.tap("IK_Enter")                     -- 월드
+    down(w, 5) w.tap("IK_Left") w.tap("IK_Left")     -- 게임 속도 x0.5
+    down(w, 2) w.tap("IK_Enter")                     -- 경찰 비활성화
+    local saved = readFile(w, "config.json")
+    truthy(saved:find('"god":true', 1, true), "god saved")
+    truthy(saved:find('"ram":false', 1, true), "untouched cheat saved as off")
+
+    local w2 = restart(w)
+    eq(next(w2.godModes), nil, "nothing applied before entering the game world")
+    w2.frames(100)
+    truthy(w2.godModes["Invulnerable|TrainerMenu"], "god mode restored")
+    truthy((w2.pools.Stamina or 0) > 0, "infinite stamina restored")
+    eq(w2.pools.Memory, nil, "RAM was off and stays off")
+    truthy(w2.equipFlags.InfiniteAmmo, "infinite ammo restored")
+    eq(#w2.statMods, 2, "carry + speed modifiers")
+    local speedMod
+    for _, mod in ipairs(w2.statMods) do
+        if mod.stat == "MaxSpeed" then speedMod = mod end
+    end
+    truthy(speedMod, "speed modifier restored")
+    near(speedMod.value, 2.0, 1e-6, "x2.0")
+    near(w2.dilation.consoleCommand, 0.5, 1e-6, "game speed restored")
+    truthy(w2.policeLocks.TrainerMenu, "police lock restored")
+    eq(w2.policeEnabled, false, "police off")
+
+    local logged = false
+    for _, line in ipairs(w2.printed) do
+        if line:find("restored from config.json: god", 1, true) then logged = true end
+    end
+    truthy(logged, "restore is logged")
+
+    openSubmenu(w2, PLAYER)
+    eq(w2.selectedRow(), 1, "cursor on god mode")
+    truthy(w2.hasText("켜짐"), "menu shows restored state")
+    truthy(w2.hasText("< x2.0 >"), "menu shows restored speed")
+end)
+
+test("turning a cheat off is saved too", function()
+    local w = boot()
+    openSubmenu(w, PLAYER)
+    w.tap("IK_Enter") -- 켬
+    truthy(readFile(w, "config.json"):find('"god":true', 1, true), "saved as on")
+    w.tap("IK_Enter") -- 끔
+    truthy(readFile(w, "config.json"):find('"god":false', 1, true), "saved as off")
+    local w2 = restart(w)
+    w2.frames(100)
+    eq(next(w2.godModes), nil, "stays off")
+end)
+
+test("mod reload / game exit does not wipe the saved state", function()
+    local w = boot()
+    openSubmenu(w, PLAYER)
+    w.tap("IK_Enter")
+    w.frames(20)
+    w.events.onShutdown() -- CET "Reload all mods" 나 게임 종료
+    eq(next(w.godModes), nil, "effect undone in the game")
+    truthy(readFile(w, "config.json"):find('"god":true', 1, true), "still saved as on")
+    local w2 = restart(w)
+    w2.frames(100)
+    truthy(w2.godModes["Invulnerable|TrainerMenu"], "back on after reload")
+end)
+
+test("noclip is restored only when key input is available", function()
+    local w = boot()
+    openSubmenu(w, PLAYER)
+    down(w, 8) w.tap("IK_Enter") -- 노클립
+    local w2 = restart(w, { codeware = false })
+    w2.frames(100)
+    eq(w2.teleports, 0, "not restored without Codeware")
+    truthy(readFile(w2, "config.json"):find('"noclip":true', 1, true), "saved value kept for later")
+    local w3 = restart(w2)
+    w3.frames(100)
+    truthy(w3.teleports > 0, "restored once Codeware is back")
+end)
+
+test("a cheat switched off in the main menu stays off next time", function()
+    local w = boot({ config = '{"cheats":{"god":true}}' })
+    w.preGame = true
+    w.frames(80, 0.05)
+    openSubmenu(w, PLAYER)
+    truthy(w.hasText("켜짐"), "shows the restored state")
+    w.tap("IK_Enter") -- 메인 메뉴에서 끔
+    truthy(w.hasText("꺼짐"), "now off")
+    local w2 = restart(w)
+    w2.frames(100)
+    eq(next(w2.godModes), nil, "stays off")
+end)
+
+test("bad cheat values in config.json are ignored or clamped", function()
+    local w = boot({ config = '{"cheats":{"god":"yes","stamina":1,"bogus":true,"speedMult":99,"gameSpeed":-5}}' })
+    w.frames(100)
+    eq(next(w.godModes), nil, "non-boolean god ignored")
+    eq(w.pools.Stamina, nil, "non-boolean stamina ignored")
+    eq(#w.statMods, 1, "only the speed modifier")
+    near(w.statMods[1].value, 5.0, 1e-6, "speed clamped to x5.0")
+    near(w.dilation.consoleCommand, 0.1, 1e-6, "game speed clamped to x0.1")
 end)
 
 test("a corrupt or hostile config.json falls back to defaults", function()

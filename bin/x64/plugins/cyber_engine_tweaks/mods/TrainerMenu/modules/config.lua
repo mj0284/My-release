@@ -14,6 +14,11 @@ Config.TOGGLE_KEYS = {
 
 Config.SAVE_SLOTS = 5
 
+-- 저장하는 켜짐/꺼짐 치트 이름 (cheats.lua 의 toggles 키와 같아야 한다)
+Config.CHEAT_TOGGLES = { "god", "stamina", "ram", "oxygen", "ammo", "carry", "noclip", "noPolice" }
+Config.SPEED_RANGE = { 0.5, 5.0 }      -- 이동 속도 배율 범위
+Config.GAME_SPEED_RANGE = { 0.1, 2.0 } -- 게임 속도 범위
+
 local function defaults()
     return {
         language = "ko",        -- "ko" | "en"
@@ -21,6 +26,10 @@ local function defaults()
         blockQuickSave = true,  -- 메뉴 키를 F5 로 바꿨을 때 게임의 F5 퀵세이브를 막는다
         noclipSpeed = 10,       -- 노클립 이동 속도 (m/s)
         positions = {},         -- 저장한 위치: ["1"] = { x=, y=, z=, yaw= }
+        cheats = {              -- 마지막으로 켜 둔 치트와 배율 (다음 실행 때 그대로 복원)
+            speedMult = 1.0,
+            gameSpeed = 1.0,
+        },
     }
 end
 
@@ -59,6 +68,20 @@ local function merge(loaded)
             if type(p) == "table" and type(p.x) == "number" and type(p.y) == "number" and type(p.z) == "number" then
                 d.positions[tostring(slot)] = { x = p.x, y = p.y, z = p.z, yaw = type(p.yaw) == "number" and p.yaw or 0 }
             end
+        end
+    end
+    if type(loaded.cheats) == "table" then
+        local c = loaded.cheats
+        for _, name in ipairs(Config.CHEAT_TOGGLES) do
+            if c[name] == true then
+                d.cheats[name] = true
+            end
+        end
+        if type(c.speedMult) == "number" and c.speedMult == c.speedMult then -- NaN 제외
+            d.cheats.speedMult = Util.clamp(c.speedMult, Config.SPEED_RANGE[1], Config.SPEED_RANGE[2])
+        end
+        if type(c.gameSpeed) == "number" and c.gameSpeed == c.gameSpeed then
+            d.cheats.gameSpeed = Util.clamp(c.gameSpeed, Config.GAME_SPEED_RANGE[1], Config.GAME_SPEED_RANGE[2])
         end
     end
     return d
